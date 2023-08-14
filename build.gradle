@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.1.2'
 	id 'io.spring.dependency-management' version '1.1.2'
+	id "org.openapi.generator" version "6.6.0"
 }
 
 group = 'com.example'
@@ -11,15 +12,62 @@ java {
 	sourceCompatibility = '17'
 }
 
+configurations {
+  compileOnly {
+    extendsFrom annotationProcessor
+  }
+}
+
 repositories {
 	mavenCentral()
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-web'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+  // implementation files('./build/spring/target/openapi-spring-0.0.1.jar') {
+	// 	builtBy 'packageApi'
+	// }
+  implementation 'org.springframework.boot:spring-boot-starter-web'
+  implementation 'org.springframework.boot:spring-boot-starter-validation'
+  // implementation 'org.openapitools:jackson-databind-nullable'
+  compileOnly 'io.swagger.core.v3:swagger-annotations:2.2.8'
+  implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.2'
+  compileOnly 'org.projectlombok:lombok'
+  developmentOnly 'org.springframework.boot:spring-boot-devtools'
+  runtimeOnly 'com.h2database:h2'
+  annotationProcessor 'org.projectlombok:lombok'
+  testImplementation 'org.springframework.boot:spring-boot-starter-test'
+  // testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.2'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+task buildApiDoc(type: org.openapitools.generator.gradle.plugin.tasks.GenerateTask) {
+    generatorName = "html2"
+    inputSpec.set("$rootDir/src/main/resources/api-schema.yaml")
+    outputDir.set("$buildDir/apidoc")
+}
+
+task buildSpringServer(type: org.openapitools.generator.gradle.plugin.tasks.GenerateTask) {
+    generatorName ="spring"
+    inputSpec.set("$rootDir/src/main/resources/api-schema.yaml")
+    outputDir.set("$buildDir/spring")
+    apiPackage.set("com.example.todoapi.controller")
+    modelPackage.set("com.example.todoapi.model")
+    configOptions.set([
+            interfaceOnly: "true"
+    ])
+}
+
+openApiValidate {
+	inputSpec = "$rootDir/src/main/resources/api-schema.yaml"
+}
+
+tasks.register('packageApi', Exec) {
+	commandLine './mvnw', 'clean', 'install', "-f", "$buildDir/spring/pom.xml"
+}
+
+
+compileJava.dependsOn tasks.buildSpringServer
+sourceSets.main.java.srcDir "$buildDir/spring/src/main/java"
